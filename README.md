@@ -12,12 +12,42 @@ Potential Data sets
    2. [Teams](http://stats.ncaa.org/team/inst_team_list?sport_code=MBB&division=1) 
    3. [Rosters](http://stats.ncaa.org/team/roster/11540?org_id=26172)
 
+###Other potential data sets to incorporate 
+
+Team Stats
+    - transform %
+
+Vegas Odds
+
+Regular season versus
+    Unfortunately I found that regular season matchups of teams in the post season are too sparse to use, and not predictive.
+
+Regular season win records vs common teams
+
+News
+    - Injuries
+    - Coaching Changes
+
+Player based
+    - biometric
+    - Individual statistics
+
+Approaches
+----------
+
+1. Predict winner of team A vs B - Gaussian 
+2. Predict scores for A and B - Binomial or Poisson)
+3. Predict proportion of posessions 
+
 Construct a summary file for all previously known postseason victories or losses
 -----------------------------------
 
 For all matchups in previously known postseasons
 
-    OBSERVATION(TEAM_VS), DID_WIN_IN_POSTSEASON (0,1), SEED_DIFFERENTIAL, REGULAR_SEASON_MATCHUP_WIN/LOSS, REGULAR_SEASON_STAT_DIFFS
+- Observation (team1_team2)
+- DID_WIN_IN_POSTSEASON (0,1)
+- SEED_DIFFERENTIAL (lseed - wseed; higher means winner was favored)
+- REGULAR_SEASON_WIN_LOSS (when the teams matched up in the regular season, what was the ratio of team 1 to team 2's wins)
 
 This can be done with
 
