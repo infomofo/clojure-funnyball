@@ -6,4 +6,5 @@
   :dependencies [
   	[org.clojure/clojure "1.5.1"],
   	[incanter "1.5.4"]]
-  :main funnyball.build)
+  :main funnyball.build
+  :jvm-opts ["-Xmx2g"])
