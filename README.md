@@ -78,10 +78,15 @@ Run a random forest classifier on this data to see how significant the features 
   + ggplot2
   + randomForest
 
+1. ``data <- read.table("output/input-r.csv", header=TRUE, sep=",")``
+2. ``rf <- randomForest(x=data[,c("seed.advantage","seed.win.loss.advantage.64")], y=as.factor(data[,c("did.win")]), importance=TRUE, proximity=TRUE)``
+
+
 Profit!
 -------
 
-Run the models against the current year's regular season results and tournament seeds
+Run the random forest model created in the previous step against the current year's regular season results and tournament seeds
 
-1. ``(use 'funnyball.predict :reload-all)``
-2. ???
+1. ``data <-  read.table("kaggle_data/current_season-r.csv", header=TRUE, sep=",")``
+2. ``data$predictWillWin <- predict(rf,data[,c("seed.advantage","seed.win.loss.advantage.64")])``
+

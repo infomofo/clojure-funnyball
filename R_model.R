@@ -7,15 +7,20 @@ library("ROCR")
 # write.table(final_data, file="~/Desktop/interview_data.csv", sep=",")
 data <- read.table("output/input-r.csv", header=TRUE, sep=",")
 
+# Plot
+ggplot(data, aes(seed.advantage, seed.win.loss.advantage.64)) + geom_point(aes(colour = did.win))
+
 #
 # Fit Random Forest
 # #
-predictors <- data[,c("seed-advantage","seed-win-loss-advantage-64")]
-fit <- randomForest(did.win~., data=data, importance=TRUE, proximity=TRUE)
-#rf <- randomForest(x=, y=as.factor(data[,c("did-win")]), importance=TRUE, proximity=TRUE)
-data$predictDidWin <- predict(fit,data[,c("seed.advantage","seed.win.loss.advantage.64")])
-# plot didPurchase
-ggplot(data, aes(seed.advantage, seed.win.loss.advantage.64)) + geom_point(aes(colour = factor(predictDidWin)))
+rf <- randomForest(x=data[,c("seed.advantage","seed.win.loss.advantage.64")], y=as.factor(data[,c("did.win")]), importance=TRUE, proximity=TRUE)
+
+##
+## Find what variables are important in predicting response
+importance(rf)
+data$predictDidWin <- predict(rf,data[,c("seed.advantage","seed.win.loss.advantage.64")])
+
+ggplot(data, aes(seed.advantage, seed.win.loss.advantage.64)) + geom_point(aes(colour = predictDidWin))
 # Confusion Matrix
 confusionMatrix(data=data$predictDidWin, reference=data$did.win)
 
