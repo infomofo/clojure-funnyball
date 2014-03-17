@@ -57,7 +57,7 @@ For all matchups in previously known postseasons
 This can be done with
 
 1. ``(use 'funnyball.build :reload-all)``
-2. ``(save-to-file results)``
+2. ``(save-to-file)``
 
 Run a binary classifier on that dataset to build a model for predicting victory
 ---------------------------------------

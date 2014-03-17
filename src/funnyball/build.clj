@@ -28,7 +28,11 @@
 )
 
 (defn tourney-results-dataset []
-	(read-dataset "./kaggle_data/tourney_results.csv" :header true)
+	(sel
+		(read-dataset "./kaggle_data/tourney_results.csv" :header true)
+		:cols
+		[:season :wteam :lteam]
+	)
 )
 
 (defn tourney-seeds-dataset []
@@ -40,6 +44,17 @@
 		#(parse-int %1)
 	)
 )
+
+;;Ratings of each team right before the tournament started
+; (defn sagp-ratings-dataset []
+; 	($rollup
+; 		:max 
+; 		($where
+; 			{:rating_day_num {:$lt 136}}
+; 			(read-dataset "./kaggle_data/sagp_weekly_ratings.csv" :header true)
+; 		)
+; 	)
+; )
 
 ;; returns the top seeded n teams in a given season.  n is an optional parameter that will default to 4.  n should be divisible by 4, or else the results may be non-deterministic
 (defn top-n-seeded-teams-in-season [season & [n]] 
@@ -144,16 +159,41 @@
 )
 
 ;;add a column win-loss indicating the win-loss ratio of the winning team over the tournament seeded teams
-(defn tourney-with-regular-season-win-loss []
-	(add-derived-column :lteam-seed-win-loss [:lteam :season] 
-		(fn [lteam season] (win-loss-vs-top-n-seeds lteam season 64)) 
-		(add-derived-column :wteam-seed-win-loss [:wteam :season] 
-			(fn [wteam season] (win-loss-vs-top-n-seeds wteam season 64)) 
-			(tourney-with-seed-advantage)
+(defn tourney-with-regular-season-seeded-team-win-loss-advantage []
+	(add-derived-column :seed-win-loss-advantage-64 [:wteam-seed-win-loss-64 :lteam-seed-win-loss-64]
+		(fn [wteamwl lteamwl] (- wteamwl lteamwl))
+		(add-derived-column :lteam-seed-win-loss-64 [:lteam :season] 
+			(fn [lteam season] (win-loss-vs-top-n-seeds lteam season 64)) 
+			(add-derived-column :wteam-seed-win-loss-64 [:wteam :season] 
+				(fn [wteam season] (win-loss-vs-top-n-seeds wteam season 64)) 
+				(tourney-with-regular-season-win-loss)
+			)
 		)
 	)
 )
 
+;;ADD ANY NEW MODEL FEATURES HERE
 
-(defn save-to-file [dataset]
-  (save dataset "./output/input.csv"))
+;;add a column obs_id
+(defn tourney-with-obs_id []
+	(add-derived-column :obs_id [:wteam :lteam :season]
+		(fn [wteam lteam season] (str season "_" wteam "_" lteam))
+		(tourney-with-regular-season-seeded-team-win-loss-advantage)
+	)
+)
+
+;;reduce dataset to the columns that we need for the prediction model
+(defn prediction-dataset []
+	(sel
+		(tourney-with-obs_id)
+		:cols
+		[:obs_id :seed-advantage :seed-win-loss-advantage-64]
+	)
+)
+
+(defn save-to-file [& [dataset]]
+  (save 
+  	(or dataset (prediction-dataset)) 
+  	"./output/input.csv"
+  )
+)
