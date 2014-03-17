@@ -1,9 +1,9 @@
 (ns funnyball.model
-  (:use 
+  (:use
   	(incanter io core)
   )
 )
 
 (defn input-dataset []
-	(read-dataset "./output/input.csv" :header true)
+	(read-dataset "./output/input-r.csv" :header true)
 )
