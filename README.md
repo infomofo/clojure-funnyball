@@ -8,11 +8,11 @@ Potential Data sets
 
 1. [Kaggle data](https://www.kaggle.com/c/march-machine-learning-mania/data)
 2. NCAA
-   1. [Rosters](http://www.ncaa.com/schools/albany-ny/basketball-men)  
-   2. [Teams](http://stats.ncaa.org/team/inst_team_list?sport_code=MBB&division=1) 
+   1. [Rosters](http://www.ncaa.com/schools/albany-ny/basketball-men)
+   2. [Teams](http://stats.ncaa.org/team/inst_team_list?sport_code=MBB&division=1)
    3. [Rosters](http://stats.ncaa.org/team/roster/11540?org_id=26172)
 
-###Other potential data sets to incorporate 
+###Other potential data sets to incorporate
 
 Team Stats
     - transform %
@@ -40,9 +40,9 @@ Player based
 Approaches
 ----------
 
-1. Predict winner of team A vs B - Gaussian 
+1. Predict winner of team A vs B - Gaussian
 2. Predict scores for A and B - Binomial or Poisson)
-3. Predict proportion of posessions 
+3. Predict proportion of posessions
 
 Construct a summary file for all previously known postseason victories or losses
 -----------------------------------
@@ -57,13 +57,20 @@ For all matchups in previously known postseasons
 This can be done with
 
 1. ``(use 'funnyball.build :reload-all)``
-2. ``(save-to-file)``
+2. ``(save-to-r-file)``
 
 Run a binary classifier on that dataset to build a model for predicting victory
 ---------------------------------------
 
+Visualize the data in a scatter plot
+
 1. ``(use 'funnyball.model :reload-all)``
-2. ???
+2. ``view-dataset``
+
+You should see a graph like this:
+
+![Scatter Plot of Two Tournament Predictor Features](doc/images/scatter-plot.png "Scatter Plot of Two Tournament Predictor Features")
+
 
 Profit!
 -------
