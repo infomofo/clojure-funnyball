@@ -71,6 +71,12 @@ You should see a graph like this:
 
 ![Scatter Plot of Two Tournament Predictor Features](doc/images/scatter-plot.png "Scatter Plot of Two Tournament Predictor Features")
 
+Run a random forest classifier on this data to see how significant the features are in predicting the response variable:
+
+- Run the steps in ``R_model.R`` in RStudio. Note that you may need to install the following packages
+  + e1071
+  + ggplot2
+  + randomForest
 
 Profit!
 -------
