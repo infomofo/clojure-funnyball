@@ -130,43 +130,45 @@
 	(col-names cleaned-tourney-seeds-dataset [:season :lseed :lteam])
 )
 
-(defn tourney-with-win-seeds [] 
+(defn add-win-seed [dataset] 
 	($join [[:season :wteam][:season :wteam]]
 		(cleaned-tourney-wseeds-dataset)
-		(tourney-results-dataset)
+		dataset
 	)
 )
 
-(defn tourney-with-win-and-loss-seeds [] 
+(defn add-win-and-loss-seeds [dataset] 
 	($join [[:season :lteam][:season :lteam]]
 		(cleaned-tourney-lseeds-dataset)
-		(tourney-with-win-seeds)
+		(add-win-seed dataset)
 	)
 )
 ;;add a column seed advantage indicating how much the winning team was favored in seed rank
-(defn tourney-with-seed-advantage [] 
+(defn add-seed-advantage [dataset] 
 	(add-derived-column :seed-advantage [:wseed :lseed] 
 		(fn [wseed lseed] (- lseed wseed)) 
-		(tourney-with-win-and-loss-seeds)
+		(add-win-and-loss-seeds
+			dataset
+		)
 	)
 )
 ;;add a column win-loss indicating the win-loss ratio of the winning team over the losing team in the regular season.  Unfortunately i found that regular season matchups were very rare, and not predictive.
-(defn tourney-with-regular-season-win-loss [] 
+(defn add-regular-season-win-loss [dataset] 
 	(add-derived-column :reg-win-loss [:wteam :lteam :season] 
 		(fn [wteam lteam season] (calc-win-loss wteam lteam season)) 
-		(tourney-with-seed-advantage)
+		dataset
 	)
 )
 
 ;;add a column win-loss indicating the win-loss ratio of the winning team over the tournament seeded teams
-(defn tourney-with-regular-season-seeded-team-win-loss-advantage []
+(defn add-regular-season-seeded-team-win-loss-advantage [dataset]
 	(add-derived-column :seed-win-loss-advantage-64 [:wteam-seed-win-loss-64 :lteam-seed-win-loss-64]
 		(fn [wteamwl lteamwl] (- wteamwl lteamwl))
 		(add-derived-column :lteam-seed-win-loss-64 [:lteam :season] 
 			(fn [lteam season] (win-loss-vs-top-n-seeds lteam season 64)) 
 			(add-derived-column :wteam-seed-win-loss-64 [:wteam :season] 
 				(fn [wteam season] (win-loss-vs-top-n-seeds wteam season 64)) 
-				(tourney-with-regular-season-win-loss)
+				dataset
 			)
 		)
 	)
@@ -174,26 +176,90 @@
 
 ;;ADD ANY NEW MODEL FEATURES HERE
 
+;; reduce dataset for winners to columns that can be inverted, and add a did_win column set to true
+(defn reduce-dataset[dataset]
+	(add-derived-column
+		:did-win 
+		[]
+		(fn [] (= 1 1))
+		(col-names
+			(sel
+				dataset
+				:cols
+				[:season :wteam :lteam :seed-advantage :seed-win-loss-advantage-64]
+			)
+			[:season :team1 :team2 :seed-advantage :seed-win-loss-advantage-64]
+		)
+	)
+)
+
+(defn complete-dataset[]
+	(reduce-dataset
+		(add-regular-season-seeded-team-win-loss-advantage
+			(add-seed-advantage
+				(tourney-results-dataset)
+			)
+		)
+	)
+)
+
+;; Takes a dataset of winning teams and returns the inverted stats for the losing teams and sets the did_win to 0
+(defn invert-dataset[dataset]
+	(sel
+		(transform-col
+			(transform-col
+				(transform-col
+					dataset
+					:seed-advantage
+					#(- 0 %1)
+				)
+				:seed-win-loss-advantage-64
+				#(- 0 %1)
+			)
+			:did-win
+			#(not %1)
+		)
+		:cols
+		[:season :team2 :team1 :seed-advantage :seed-win-loss-advantage-64 :did-win]
+	)
+)
+
+;; unions a dataset for winning teams with an equivalent dataset for losing teams
+(defn add-inverse-dataset[dataset]
+	(conj-rows
+		dataset
+		(invert-dataset dataset)
+	)
+)
+
 ;;add a column obs_id
-(defn tourney-with-obs_id []
-	(add-derived-column :obs_id [:wteam :lteam :season]
-		(fn [wteam lteam season] (str season "_" wteam "_" lteam))
-		(tourney-with-regular-season-seeded-team-win-loss-advantage)
+(defn add-obs-id [dataset]
+	(add-derived-column :obs-id [:team1 :team2 :season]
+		(fn [team1 team2 season] (str season "_" team1 "_" team2))
+		dataset
+	)
+)
+
+(defn prediction-dataset[] 
+	(add-obs-id
+		(add-inverse-dataset
+			(complete-dataset)
+		)
 	)
 )
 
 ;;reduce dataset to the columns that we need for the prediction model
-(defn prediction-dataset []
+(defn output-dataset []
 	(sel
-		(tourney-with-obs_id)
+		(prediction-dataset)
 		:cols
-		[:obs_id :seed-advantage :seed-win-loss-advantage-64]
+		[:obs-id :did-win :seed-advantage :seed-win-loss-advantage-64]
 	)
 )
 
 (defn save-to-file [& [dataset]]
   (save 
-  	(or dataset (prediction-dataset)) 
+  	(or dataset (output-dataset)) 
   	"./output/input.csv"
   )
 )
