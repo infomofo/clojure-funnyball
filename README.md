@@ -23,6 +23,11 @@ Regular season versus
     Unfortunately I found that regular season matchups of teams in the post season are too sparse to use, and not predictive.
 
 Regular season win records vs common teams
+    - i.e. top 4/8/16 seeds that season
+    - i.e. all other seeded teams in the tournament
+
+Aggregated Team Ratings
+    - Sagarin
 
 News
     - Injuries
