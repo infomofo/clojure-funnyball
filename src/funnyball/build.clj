@@ -239,6 +239,27 @@
      :seed-win-loss-advantage-64
      #(float %1)))
 
+(defn current-complete-dataset[]
+  (reduce-dataset
+    (add-sagp-advantage
+      (add-regular-season-win-loss
+        (add-regular-season-seeded-team-win-loss-advantage
+          (add-seed-advantage
+            (tourney-results-dataset)))))))
+
+(defn current-dataset[]
+  (add-obs-id
+    (current-complete-dataset)))
+
+;;reduce dataset to the columns that we need for the prediction model in r and convert to r formats
+(defn current-r-dataset []
+  (transform-col
+    (sel
+      (current-dataset)
+      :cols
+      [:obs-id :seed-advantage :seed-win-loss-advantage-64 :sagp-advantage])
+     :seed-win-loss-advantage-64
+     #(float %1)))
 
 (defn save-to-file [& [dataset]]
   (save
@@ -249,3 +270,8 @@
   (save
     (or dataset (output-r-dataset))
     "./output/input-r.csv"))
+
+(defn save-current-season-to-r-file [& [dataset]]
+  (save
+    (or dataset (current-r-dataset))
+    "./output/current-r.csv"))
