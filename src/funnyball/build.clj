@@ -32,6 +32,18 @@
 (defn tourney-seeds-dataset []
   (read-dataset "./kaggle_data/tourney_seeds.csv" :header true))
 
+(def current-tourney-seeds-dataset
+  (read-dataset "./kaggle_data_new/tourney_seeds.csv" :header true))
+
+(def teams-in-current-tourney
+  (sort ($ :team current-tourney-seeds-dataset)))
+
+(defn current-tourney-cartesian-product-dataset[]
+  (col-names (to-dataset (for [x teams-in-current-tourney
+                                y (filter #(> %1 x) teams-in-current-tourney)]
+                              [x y]))
+             [:team1 :team2]))
+
 (def cleaned-tourney-seeds-dataset
   (transform-col (tourney-seeds-dataset) :seed
     #(parse-int %1)))
