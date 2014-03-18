@@ -24,10 +24,9 @@
 ;;returns only the rows of the sagp rating where rating_day_num is the max(rating_day_num) for that season
 
 (defn tourney-results-dataset []
-  (sel
-    (read-dataset "./kaggle_data/tourney_results.csv" :header true)
-    :cols
-    [:season :wteam :lteam]))
+      (sel (read-dataset "./kaggle_data/tourney_results.csv" :header true)
+           :cols
+           [:season :wteam :lteam]))
 
 (defn tourney-seeds-dataset []
   (read-dataset "./kaggle_data/tourney_seeds.csv" :header true))
@@ -38,11 +37,15 @@
 (def teams-in-current-tourney
   (sort ($ :team current-tourney-seeds-dataset)))
 
-(defn current-tourney-cartesian-product-dataset[]
-  (col-names (to-dataset (for [x teams-in-current-tourney
-                                y (filter #(> %1 x) teams-in-current-tourney)]
-                              [x y]))
-             [:team1 :team2]))
+;; returns the current tourney dataset - names them "wteam" and "lteam" just for reusability purposes with legacy dataset
+(defn current-tourney-cartesian-product-dataset []
+  (col-names   (add-derived-column :season
+                                   []
+                                   (fn [] "S")
+                                   (to-dataset (for [x teams-in-current-tourney
+                                                     y (filter #(> %1 x) teams-in-current-tourney)]
+                                                 [x y])))
+               [:wteam :lteam :season]))
 
 (def cleaned-tourney-seeds-dataset
   (transform-col (tourney-seeds-dataset) :seed
