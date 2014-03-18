@@ -11,48 +11,48 @@
   (def non-nil-sq (filter not-nil? sq))
     (if (empty? non-nil-sq)
         0
-        (/ (reduce + non-nil-sq) (count non-nil-sq))
-    )
-)
+        (/ (reduce + non-nil-sq) (count non-nil-sq))))
 
 ; (def teams-dataset (read-dataset "./kaggle_data/teams.csv" :header true))
 
 (defn regular-season-dataset []
-  (read-dataset "./kaggle_data/regular_season_results.csv" :header true)
-)
+  (read-dataset "./kaggle_data/regular_season_results.csv" :header true))
 
 (def season-win-loss-records
-  ($group-by [:wteam :lteam :season] (regular-season-dataset))
-)
+  ($group-by [:wteam :lteam :season] (regular-season-dataset)))
+
+;;returns only the rows of the sagp rating where rating_day_num is the max(rating_day_num) for that season
 
 (defn tourney-results-dataset []
   (sel
     (read-dataset "./kaggle_data/tourney_results.csv" :header true)
     :cols
-    [:season :wteam :lteam]
-  )
-)
+    [:season :wteam :lteam]))
 
 (defn tourney-seeds-dataset []
-  (read-dataset "./kaggle_data/tourney_seeds.csv" :header true)
-)
+  (read-dataset "./kaggle_data/tourney_seeds.csv" :header true))
 
 (def cleaned-tourney-seeds-dataset
   (transform-col (tourney-seeds-dataset) :seed
-    #(parse-int %1)
-  )
-)
+    #(parse-int %1)))
 
-;;Ratings of each team right before the tournament started
-; (defn sagp-ratings-dataset []
-;   ($rollup
-;     :max
-;     ($where
-;       {:rating_day_num {:$lt 136}}
-;       (read-dataset "./kaggle_data/sagp_weekly_ratings.csv" :header true)
-;     )
-;   )
-; )
+;Ratings of each team right before the tournament started
+(def sagp-ratings-dataset
+  ($where
+    {:rating_day_num {:$eq 133}}
+    (read-dataset "./kaggle_data/sagp_weekly_ratings.csv" :header true)))
+
+;; Never mind it's always 133
+; (defn sagp-max-daynum-for-season []
+;   ($rollup :max :rating_day_num :season (sagp-ratings-dataset)))
+
+(defn lookup-sagp [team season]
+  (def temp ($ :rating
+       ($where {:team team :season season}
+                      sagp-ratings-dataset)))
+  (if (instance? Double temp)
+    temp
+    nil))
 
 ;; returns the top seeded n teams in a given season.  n is an optional parameter that will default to 4.  n should be divisible by 4, or else the results may be non-deterministic
 (defn top-n-seeded-teams-in-season [season & [n]]
@@ -139,6 +139,19 @@
         (fn [wteam season] (win-loss-vs-top-n-seeds wteam season 64))
         dataset))))
 
+;;add a column sapg-diff indicating the sagp rating difference between the winning and losing team
+(defn add-sagp-advantage [dataset]
+  (add-derived-column :sagp-advantage [:wteam-sagp :lteam-sagp]
+    (fn [wteamsagp lteamsagp] (if (or (nil? wteamsagp)
+                                      (nil? lteamsagp))
+                                  nil
+                                  (- wteamsagp lteamsagp)))
+    (add-derived-column :lteam-sagp [:lteam :season]
+      (fn [lteam season] (lookup-sagp lteam season))
+      (add-derived-column :wteam-sagp [:wteam :season]
+        (fn [wteam season] (lookup-sagp wteam season))
+        dataset))))
+
 ;;ADD ANY NEW MODEL FEATURES HERE
 
 ;; reduce dataset for winners to columns that can be inverted, and add a did_win column set to true
@@ -151,15 +164,16 @@
       (sel
         dataset
         :cols
-        [:season :wteam :lteam :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss])
-      [:season :team1 :team2 :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss])))
+        [:season :wteam :lteam :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss :sagp-advantage])
+      [:season :team1 :team2 :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss :sagp-advantage])))
 
 (defn complete-dataset[]
   (reduce-dataset
-    (add-regular-season-win-loss
-      (add-regular-season-seeded-team-win-loss-advantage
-        (add-seed-advantage
-          (tourney-results-dataset))))))
+    (add-sagp-advantage
+      (add-regular-season-win-loss
+        (add-regular-season-seeded-team-win-loss-advantage
+          (add-seed-advantage
+            (tourney-results-dataset)))))))
 
 ;; Takes a dataset of winning teams and returns the inverted stats for the losing teams and sets the did_win to 0
 (defn invert-dataset[dataset]
@@ -168,22 +182,28 @@
       (transform-col
         (transform-col
           (transform-col
-            dataset
-            :seed-advantage
+            (transform-col
+              dataset
+              :seed-advantage
+              #(- 0 %1))
+            :seed-win-loss-advantage-64
             #(- 0 %1))
-          :seed-win-loss-advantage-64
-          #(- 0 %1))
-        :did-win
-        #(not %1))
-      :reg-win-loss
-      (fn [regwl]
-        (if (nil? regwl)
+          :did-win
+          #(not %1))
+        :reg-win-loss
+        (fn [regwl]
+          (if (nil? regwl)
+            nil
+            (if (= 0 regwl)
+              1
+              (/ 1 regwl)))))
+      :sagp-advantage
+      (fn [sagpadv]
+        (if (nil? sagpadv)
           nil
-          (if (= 0 regwl)
-            1
-            (/ 1 regwl)))))
+          (- 0 sagpadv))))
     :cols
-    [:season :team2 :team1 :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss :did-win ]))
+    [:season :team2 :team1 :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss :sagp-advantage :did-win]))
 
 ;; unions a dataset for winning teams with an equivalent dataset for losing teams
 (defn add-inverse-dataset[dataset]
@@ -215,7 +235,7 @@
     (sel
       (prediction-dataset)
       :cols
-      [:did-win :seed-advantage :seed-win-loss-advantage-64])
+      [:did-win :seed-advantage :seed-win-loss-advantage-64 :sagp-advantage])
      :seed-win-loss-advantage-64
      #(float %1)))
 
