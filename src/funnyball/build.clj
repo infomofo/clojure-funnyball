@@ -151,14 +151,15 @@
       (sel
         dataset
         :cols
-        [:season :wteam :lteam :seed-advantage :seed-win-loss-advantage-64])
-      [:season :team1 :team2 :seed-advantage :seed-win-loss-advantage-64])))
+        [:season :wteam :lteam :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss])
+      [:season :team1 :team2 :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss])))
 
 (defn complete-dataset[]
   (reduce-dataset
-    (add-regular-season-seeded-team-win-loss-advantage
-      (add-seed-advantage
-        (tourney-results-dataset)))))
+    (add-regular-season-win-loss
+      (add-regular-season-seeded-team-win-loss-advantage
+        (add-seed-advantage
+          (tourney-results-dataset))))))
 
 ;; Takes a dataset of winning teams and returns the inverted stats for the losing teams and sets the did_win to 0
 (defn invert-dataset[dataset]
@@ -166,15 +167,23 @@
     (transform-col
       (transform-col
         (transform-col
-          dataset
-          :seed-advantage
+          (transform-col
+            dataset
+            :seed-advantage
+            #(- 0 %1))
+          :seed-win-loss-advantage-64
           #(- 0 %1))
-        :seed-win-loss-advantage-64
-        #(- 0 %1))
-      :did-win
-      #(not %1))
+        :did-win
+        #(not %1))
+      :reg-win-loss
+      (fn [regwl]
+        (if (nil? regwl)
+          nil
+          (if (= 0 regwl)
+            1
+            (/ 1 regwl)))))
     :cols
-    [:season :team2 :team1 :seed-advantage :seed-win-loss-advantage-64 :did-win]))
+    [:season :team2 :team1 :seed-advantage :seed-win-loss-advantage-64 :reg-win-loss :did-win ]))
 
 ;; unions a dataset for winning teams with an equivalent dataset for losing teams
 (defn add-inverse-dataset[dataset]

@@ -4,7 +4,6 @@ library("randomForest")
 library("glmnet")
 library("ROCR")
 
-# write.table(final_data, file="~/Desktop/interview_data.csv", sep=",")
 data <- read.table("output/input-r.csv", header=TRUE, sep=",")
 
 # Plot
@@ -13,8 +12,11 @@ ggplot(data, aes(seed.advantage, seed.win.loss.advantage.64)) + geom_point(aes(c
 #
 # Fit Random Forest
 # #
-rf <- randomForest(x=data[,c("seed.advantage","seed.win.loss.advantage.64")], y=as.factor(data[,c("did.win")]), importance=TRUE, proximity=TRUE)
-
+y <-  as.factor(data[,c("did.win")])
+x <- data[,c("seed.advantage","seed.win.loss.advantage.64")]
+rf <- randomForest(did.win~., importance=TRUE, proximity=TRUE)
+rf
+data
 ##
 ## Find what variables are important in predicting response
 importance(rf)
