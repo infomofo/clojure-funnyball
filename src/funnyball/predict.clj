@@ -1,6 +1,19 @@
-(ns funnyball.predict)
+(ns funnyball.predict (:use (incanter io
+                                      core
+                                      charts)))
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
+
+
+(defn input-dataset []
+	(read-dataset "./output/submission.csv"
+                :header true))
+
+(defn format-kaggle-output[]
+  (col-names (sel (input-dataset)
+                  :cols
+                  [:obs.id :probability.true])
+             [:id :pred]))
+
+(defn output-kaggle-predictions []
+  (save (format-kaggle-output)
+        "./output/kaggle_submission.csv"))

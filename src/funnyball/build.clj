@@ -9,7 +9,7 @@
 
 (defn calc-mean [sq]
   (def non-nil-sq (filter not-nil? sq))
-  (if (empty? non-nil-sq)
+    (if (empty? non-nil-sq)
     0
     (/ (reduce + non-nil-sq)
        (count non-nil-sq))))
@@ -17,7 +17,7 @@
 ; (def teams-dataset (read-dataset "./kaggle_data/teams.csv" :header true))
 
 (defn regular-season-dataset []
-  (read-dataset "./kaggle_data/regular_season_results.csv"
+  (read-dataset "./kaggle_data_new/regular_season_results.csv"
                 :header true))
 
 (def season-win-loss-records
@@ -32,27 +32,25 @@
        [:season :wteam :lteam]))
 
 (defn tourney-seeds-dataset []
-  (read-dataset "./kaggle_data/tourney_seeds.csv" :header true))
+  (read-dataset "./kaggle_data_new/tourney_seeds.csv" :header true))
 
 (def current-tourney-seeds-dataset
-  (read-dataset "./kaggle_data_new/tourney_seeds.csv" :header true))
+  (read-dataset "./kaggle_data_new/current_tourney_seeds.csv" :header true))
 
 (def teams-in-current-tourney
   (sort ($ :team current-tourney-seeds-dataset)))
 
 ;; returns the current tourney dataset - names them "wteam" and "lteam" just for reusability purposes with legacy dataset
 (defn current-tourney-cartesian-product-dataset []
-  (col-names   (add-derived-column :season
-                                   []
-                                   (fn [] "S")
-                                   (to-dataset (for [x teams-in-current-tourney
+  (col-names   (to-dataset (for [x teams-in-current-tourney
                                                      y (filter #(> %1 x) teams-in-current-tourney)]
-                                                 [x y])))
-               [:wteam :lteam :season]))
+                                                 ["S" x y]))
+               [:season :wteam :lteam]))
 
 (def cleaned-tourney-seeds-dataset
   (transform-col (tourney-seeds-dataset) :seed
                  #(parse-int %1)))
+
 
 ;Ratings of each team right before the tournament started
 (def sagp-ratings-dataset
@@ -60,7 +58,7 @@
           (read-dataset "./kaggle_data/sagp_weekly_ratings.csv" :header true)))
 
 ;Ratings of each team right before the tournament started
-(def sagp-curent-ratings-dataset
+(def sagp-current-ratings-dataset
   (read-dataset "./kaggle_data_new/sagarin-current-workbook.csv" :header true))
 
 ;; Never mind it's always 133
@@ -71,6 +69,14 @@
   (def temp ($ :rating
        ($where {:team team :season season}
                       sagp-ratings-dataset)))
+  (if (instance? Double temp)
+    temp
+    nil))
+
+(defn lookup-current-sagp [team]
+  (def temp ($ :rating
+       ($where {:team_id team}
+                      sagp-current-ratings-dataset)))
   (if (instance? Double temp)
     temp
     nil))
@@ -86,25 +92,26 @@
           cleaned-tourney-seeds-dataset))))
 
 (defn calc-win-loss [team1 team2 season]
-  ; (println "calculating win/loss ratio of " team1 " and " team2 " in season " season)
+;;   (println "calculating win/loss ratio of " team1 " and " team2 " in season " season)
   (def wins (or (nrow
                  (get
                   season-win-loss-records
                   {:season season :lteam team2 :wteam team1}))
                 0))
-  ; (println wins "wins")
+;;   (println wins "wins")
   (def losses (or (nrow
                    (get
                     season-win-loss-records
                     {:season season :lteam team1 :wteam team2}))
                   0))
-  ; (println losses "losses")
+;;   (println losses "losses")
   (def total (+ wins losses))
   (if (= team1 team2)
     nil
     (if (= 0 total)
       nil
       (/ wins total))))
+
 
 (defn win-loss-vs-top-n-seeds [team season & [n]]
   (calc-mean (map #(calc-win-loss team %1 season)
@@ -136,19 +143,21 @@
 
 ;;add a column win-loss indicating the win-loss ratio of the winning team over the losing team in the regular season.  Unfortunately i found that regular season matchups were very rare, and not predictive.
 (defn add-regular-season-win-loss [dataset]
-  (add-derived-column :reg-win-loss [:wteam :lteam :season]
-    (fn [wteam lteam season] (calc-win-loss wteam lteam season))
-    dataset))
+  (add-derived-column :reg-win-loss
+                      [:wteam :lteam :season]
+                      (fn [wteam lteam season]
+                        (calc-win-loss wteam lteam season))
+                      dataset))
 
 ;;add a column win-loss indicating the win-loss ratio of the winning team over the tournament seeded teams
 (defn add-regular-season-seeded-team-win-loss-advantage [dataset]
   (add-derived-column :seed-win-loss-advantage-64 [:wteam-seed-win-loss-64 :lteam-seed-win-loss-64]
-    (fn [wteamwl lteamwl] (- wteamwl lteamwl))
-    (add-derived-column :lteam-seed-win-loss-64 [:lteam :season]
-      (fn [lteam season] (win-loss-vs-top-n-seeds lteam season 64))
-      (add-derived-column :wteam-seed-win-loss-64 [:wteam :season]
-        (fn [wteam season] (win-loss-vs-top-n-seeds wteam season 64))
-        dataset))))
+                      (fn [wteamwl lteamwl] (- wteamwl lteamwl))
+                      (add-derived-column :lteam-seed-win-loss-64 [:lteam :season]
+                                          (fn [lteam season] (win-loss-vs-top-n-seeds lteam season 64))
+                                          (add-derived-column :wteam-seed-win-loss-64 [:wteam :season]
+                                                              (fn [wteam season] (win-loss-vs-top-n-seeds wteam season 64))
+                                                              dataset))))
 
 ;;add a column sapg-diff indicating the sagp rating difference between the winning and losing team
 (defn add-sagp-advantage [dataset]
@@ -163,6 +172,17 @@
         (fn [wteam season] (lookup-sagp wteam season))
         dataset))))
 
+(defn add-current-sagp-advantage [dataset]
+  (add-derived-column :sagp-advantage [:wteam-sagp :lteam-sagp]
+                      (fn [wteamsagp lteamsagp] (if (or (nil? wteamsagp)
+                                                        (nil? lteamsagp))
+                                                  nil
+                                                  (- wteamsagp lteamsagp)))
+                      (add-derived-column :lteam-sagp [:lteam]
+                                          (fn [lteam] (lookup-current-sagp lteam))
+                                          (add-derived-column :wteam-sagp [:wteam]
+                                                              (fn [wteam] (lookup-current-sagp wteam))
+                                                              dataset))))
 ;;ADD ANY NEW MODEL FEATURES HERE
 
 ;; reduce dataset for winners to columns that can be inverted, and add a did_win column set to true
@@ -222,7 +242,7 @@
 ;;add a column obs_id
 (defn add-obs-id [dataset]
   (add-derived-column :obs-id
-                      [:team1 :team2 :season]
+                      [:wteam :lteam :season]
                       (fn [team1 team2 season] (str season "_" team1 "_" team2))
                       dataset))
 
@@ -243,20 +263,15 @@
                  #(float %1)))
 
 (defn current-complete-dataset[]
-  (reduce-dataset
-    (add-sagp-advantage
-      (add-regular-season-win-loss
+  (add-obs-id
+    (add-current-sagp-advantage
         (add-regular-season-seeded-team-win-loss-advantage
           (add-seed-advantage
-            (tourney-results-dataset)))))))
-
-(defn current-dataset[]
-  (add-obs-id
-    (current-complete-dataset)))
+            (current-tourney-cartesian-product-dataset))))))
 
 ;;reduce dataset to the columns that we need for the prediction model in r and convert to r formats
 (defn current-r-dataset []
-  (transform-col (sel (current-dataset)
+  (transform-col (sel (current-complete-dataset)
                       :cols
                       [:obs-id :seed-advantage :seed-win-loss-advantage-64 :sagp-advantage])
                  :seed-win-loss-advantage-64
